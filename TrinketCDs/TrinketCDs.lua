@@ -821,28 +821,58 @@ end
 -- ============================================================
 
 function ADDON:OnEvent(event, arg1)
-	if event == "ADDON_LOADED" then
+    if event == "ADDON_LOADED" then
         if arg1 ~= ADDON_NAME then return end
-
-        local svars = _G[ADDON_PROFILE]
-        if svars then
-            update_nested_settings(svars, "ITEMS")
-            update_settings(svars.SWITCHES, SWITCHES)
-        end
-        _G[ADDON_PROFILE] = SETTINGS
 
         -- Initialize profiles storage
         if not _G.TrinketCDsProfiles then
             _G.TrinketCDsProfiles = {}
         end
 
+        -- Initialize per-character profile storage
+        if not _G.TrinketCDsProfileChar then
+            _G.TrinketCDsProfileChar = {}
+        end
+
+        -- Load per-character settings if they exist, otherwise use account-wide
+        local char_settings = _G.TrinketCDsProfileChar.SETTINGS
+        local svars = char_settings or _G[ADDON_PROFILE]
+
+        if svars then
+            update_nested_settings(svars, "ITEMS")
+            update_settings(svars.SWITCHES, SWITCHES)
+        end
+
+        _G[ADDON_PROFILE] = SETTINGS
+
         for _, slot_ID in ipairs(self.SORTED_ITEMS) do
             self.FRAMES[slot_ID] = CreateNewItemFrame(slot_ID)
         end
 
         set_trinket_swap_id()
-	end
+
+    elseif event == "PLAYER_LOGOUT" then
+        -- Auto-save current settings per-character on logout
+        if not _G.TrinketCDsProfileChar then
+            _G.TrinketCDsProfileChar = {}
+        end
+        local saved = { ITEMS = {}, SWITCHES = {} }
+        for slot_ID, settings in pairs(SETTINGS.ITEMS) do
+            saved.ITEMS[slot_ID] = {}
+            for k, v in pairs(settings) do
+                saved.ITEMS[slot_ID][k] = v
+            end
+        end
+        for k, v in pairs(SWITCHES) do
+            saved.SWITCHES[k] = v
+        end
+        _G.TrinketCDsProfileChar.SETTINGS = saved
+    end
 end
+
+ADDON:RegisterEvent("ADDON_LOADED")
+ADDON:RegisterEvent("PLAYER_LOGOUT")
+ADDON:SetScript("OnEvent", ADDON.OnEvent)
 
 ADDON:RegisterEvent("ADDON_LOADED")
 ADDON:SetScript("OnEvent", ADDON.OnEvent)
