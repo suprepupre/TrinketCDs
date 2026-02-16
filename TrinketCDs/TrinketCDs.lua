@@ -30,6 +30,12 @@ local UnitAffectingCombat = UnitAffectingCombat
 local GetInventoryItemCooldown = GetInventoryItemCooldown
 local GetContainerNumFreeSlots = GetContainerNumFreeSlots or C_Container and C_Container.GetContainerNumFreeSlots
 
+-- ============================================================
+-- Drag & Drop state
+-- ============================================================
+local DRAG_UNLOCK = false  -- global unlock toggle
+ADDON.DRAG_UNLOCK = false
+
 local function new_item(item_ID)
     if not item_ID then return end
     local _, _, item_quality, item_level, _, _, _, _, _, item_texture = GetItemInfo(item_ID)
@@ -346,14 +352,57 @@ local function ItemChanged(self)
     end
 end
 
+-- ============================================================
+-- Drag & Drop functions
+-- ============================================================
+local function OnDragStart(self)
+    if InCombatLockdown() then return end
+    if not ADDON.DRAG_UNLOCK then return end
+    self:StartMoving()
+    self.isMoving = true
+end
+
+local function OnDragStop(self)
+    if not self.isMoving then return end
+    self:StopMovingOrSizing()
+    self.isMoving = false
+
+    -- Save position relative to CENTER of UIParent
+    local scale = self:GetEffectiveScale()
+    local uiScale = UIParent:GetEffectiveScale()
+    local cx, cy = self:GetCenter()
+    local ux, uy = UIParent:GetCenter()
+
+    local posX = (cx * scale - ux * uiScale) / uiScale
+    local posY = (cy * scale - uy * uiScale) / uiScale
+
+    self.settings.POS_X = floor(posX + 0.5)
+    self.settings.POS_Y = floor(posY + 0.5)
+
+    -- Update sliders in options if they exist
+    if ADDON.OPTIONS and ADDON.OPTIONS.UpdateSliders then
+        ADDON.OPTIONS:UpdateSliders(self.slot_ID)
+    end
+end
+
+local function SetupDragForFrame(self)
+    self:SetMovable(true)
+    self:SetClampedToScreen(true)
+    self:RegisterForDrag("LeftButton")
+    self:SetScript("OnDragStart", OnDragStart)
+    self:SetScript("OnDragStop", OnDragStop)
+end
+
+-- ============================================================
+
 local function OnMouseDown(self, button)
     self = self.parent or self
+    if ADDON.DRAG_UNLOCK then return end -- don't process clicks while in drag mode
     if InCombatLockdown() then
         if not IsModifierKeyDown() then return end
         print(ADDON_NAME_COLOR .. "Leave combat to swap items")
     elseif button == "LeftButton" then
         if IsControlKeyDown() then
-            -- Ctrl+left mouse reequips item to force it's cooldown
             self.swap_back_item_id = self.item.ID
             for i=0,4 do
                 local free_slots, bag_type = GetContainerNumFreeSlots(i)
@@ -364,7 +413,6 @@ local function OnMouseDown(self, button)
             end
 
         elseif IsShiftKeyDown() then
-            -- Shift+left mouse swaps trinkets to force cooldown of both
             if self.slot_ID == 13 then
                 EquipItemByName(self.item.ID, 14)
             elseif self.slot_ID == 14 then
@@ -372,7 +420,6 @@ local function OnMouseDown(self, button)
             end
 
         elseif IsAltKeyDown() then
-            -- Alt+left mouse swaps to an item with the same name: pnl 277 <-> 264
             local item_name = GetItemInfo(self.item.ID)
             EquipItemByName(item_name, self.slot_ID)
         end
@@ -399,6 +446,7 @@ local function OnEvent(self, event, arg1, arg2)
 
     elseif event == "MODIFIER_STATE_CHANGED" then
         if InCombatLockdown() then return end
+        if ADDON.DRAG_UNLOCK then return end -- don't toggle mouse in drag mode
         self:EnableMouse(arg2 == 1)
 
     elseif event == "PLAYER_REGEN_DISABLED" then
@@ -511,7 +559,8 @@ local function RedrawFrame(self)
     if InCombatLockdown() then return end
 
     self:SetSize(_icon_size, _icon_size)
-    self:SetPoint("CENTER", self.settings.POS_X, self.settings.POS_Y)
+    self:ClearAllPoints()
+    self:SetPoint("CENTER", UIParent, "CENTER", self.settings.POS_X, self.settings.POS_Y)
 
     self:ToggleButton()
     self:ToggleVisibility()
@@ -523,6 +572,12 @@ end
 
 local function ToggleVisibility(self)
     if not self.item or self.button and InCombatLockdown() then return end
+
+    -- Always show when drag is unlocked
+    if ADDON.DRAG_UNLOCK then
+        self:Show()
+        return
+    end
 
     if self.settings.SHOW == 0
     or SWITCHES.COMBAT_ONLY ~= 0 and not PlayerInCombat()
@@ -598,6 +653,9 @@ local function CreateNewItemFrame(slot_ID)
     add_text_layer(self)
     add_functions(self)
 
+    -- Setup drag & drop
+    SetupDragForFrame(self)
+
     self:RedrawFrame()
 
     return self
@@ -639,6 +697,129 @@ local function set_trinket_swap_id()
     ADDON.TRINKET_SWAP_ID = tonumber(item_id)
 end
 
+-- ============================================================
+-- Profile system
+-- ============================================================
+local function GetCharacterKey()
+    local name = UnitName("player")
+    local realm = GetRealmName()
+    return name and realm and (name .. " - " .. realm) or nil
+end
+
+function ADDON:SaveCurrentProfile(profileName)
+    if not profileName then return end
+    if not _G.TrinketCDsProfiles then
+        _G.TrinketCDsProfiles = {}
+    end
+    local profiles = _G.TrinketCDsProfiles
+
+    -- Deep copy current settings
+    local saved = { ITEMS = {}, SWITCHES = {} }
+    for slot_ID, settings in pairs(SETTINGS.ITEMS) do
+        saved.ITEMS[slot_ID] = {}
+        for k, v in pairs(settings) do
+            saved.ITEMS[slot_ID][k] = v
+        end
+    end
+    for k, v in pairs(SWITCHES) do
+        saved.SWITCHES[k] = v
+    end
+
+    profiles[profileName] = saved
+    print(ADDON_NAME_COLOR .. format("Profile '%s' saved.", profileName))
+end
+
+function ADDON:LoadProfile(profileName)
+    if not profileName then return end
+    local profiles = _G.TrinketCDsProfiles
+    if not profiles or not profiles[profileName] then
+        print(ADDON_NAME_COLOR .. format("Profile '%s' not found.", profileName))
+        return
+    end
+
+    local saved = profiles[profileName]
+    if saved.ITEMS then
+        for slot_ID, saved_settings in pairs(saved.ITEMS) do
+            if SETTINGS.ITEMS[slot_ID] then
+                for k, v in pairs(saved_settings) do
+                    SETTINGS.ITEMS[slot_ID][k] = v
+                end
+            end
+        end
+    end
+    if saved.SWITCHES then
+        for k, v in pairs(saved.SWITCHES) do
+            SWITCHES[k] = v
+        end
+    end
+
+    -- Redraw all frames
+    for _, frame in pairs(self.FRAMES) do
+        frame:RedrawFrame()
+    end
+
+    print(ADDON_NAME_COLOR .. format("Profile '%s' loaded.", profileName))
+end
+
+function ADDON:DeleteProfile(profileName)
+    if not profileName then return end
+    local profiles = _G.TrinketCDsProfiles
+    if not profiles or not profiles[profileName] then
+        print(ADDON_NAME_COLOR .. format("Profile '%s' not found.", profileName))
+        return
+    end
+    profiles[profileName] = nil
+    print(ADDON_NAME_COLOR .. format("Profile '%s' deleted.", profileName))
+end
+
+function ADDON:GetProfileList()
+    local profiles = _G.TrinketCDsProfiles
+    if not profiles then return {} end
+    local list = {}
+    for name in pairs(profiles) do
+        list[#list+1] = name
+    end
+    sort(list)
+    return list
+end
+
+function ADDON:ToggleDragUnlock()
+    if InCombatLockdown() then
+        print(ADDON_NAME_COLOR .. "Cannot toggle drag mode in combat.")
+        return
+    end
+
+    ADDON.DRAG_UNLOCK = not ADDON.DRAG_UNLOCK
+
+    for _, frame in pairs(self.FRAMES) do
+        frame:EnableMouse(ADDON.DRAG_UNLOCK)
+        if ADDON.DRAG_UNLOCK then
+            -- Show all frames for positioning
+            frame:Show()
+            -- Show a highlight border
+            if not frame.drag_highlight then
+                frame.drag_highlight = frame:CreateTexture(nil, "HIGHLIGHT")
+                frame.drag_highlight:SetAllPoints()
+                frame.drag_highlight:SetTexture(1, 1, 0, 0.3)
+            end
+            frame.drag_highlight:Show()
+        else
+            if frame.drag_highlight then
+                frame.drag_highlight:Hide()
+            end
+            frame:ToggleVisibility()
+        end
+    end
+
+    if ADDON.DRAG_UNLOCK then
+        print(ADDON_NAME_COLOR .. "|cFF00FF00Drag mode ENABLED|r - drag icons to reposition. Type |cFFFFFF00/tcd lock|r to save positions.")
+    else
+        print(ADDON_NAME_COLOR .. "|cFFFF0000Drag mode DISABLED|r - positions saved.")
+    end
+end
+
+-- ============================================================
+
 function ADDON:OnEvent(event, arg1)
 	if event == "ADDON_LOADED" then
         if arg1 ~= ADDON_NAME then return end
@@ -649,6 +830,11 @@ function ADDON:OnEvent(event, arg1)
             update_settings(svars.SWITCHES, SWITCHES)
         end
         _G[ADDON_PROFILE] = SETTINGS
+
+        -- Initialize profiles storage
+        if not _G.TrinketCDsProfiles then
+            _G.TrinketCDsProfiles = {}
+        end
 
         for _, slot_ID in ipairs(self.SORTED_ITEMS) do
             self.FRAMES[slot_ID] = CreateNewItemFrame(slot_ID)
@@ -676,11 +862,44 @@ function SlashCmdList.RIDEPAD_TRINKETS(arg)
             msg = format("%s\n%.3fs | %d function calls", msg, t / 1000, c)
         end
         print(msg)
+
     elseif arg == "o" or arg == "opt" or arg == "options" or arg == "config" then
 		InterfaceOptionsFrame_OpenToCategory(ADDON_NAME)
+
+    elseif arg == "drag" or arg == "unlock" or arg == "lock" or arg == "move" then
+        ADDON:ToggleDragUnlock()
+
+    elseif arg:match("^save ") then
+        local profileName = arg:match("^save (.+)$")
+        ADDON:SaveCurrentProfile(strtrim(profileName))
+
+    elseif arg:match("^load ") then
+        local profileName = arg:match("^load (.+)$")
+        ADDON:LoadProfile(strtrim(profileName))
+
+    elseif arg:match("^delete ") then
+        local profileName = arg:match("^delete (.+)$")
+        ADDON:DeleteProfile(strtrim(profileName))
+
+    elseif arg == "profiles" or arg == "list" then
+        local list = ADDON:GetProfileList()
+        if #list == 0 then
+            print(ADDON_NAME_COLOR .. "No saved profiles.")
+        else
+            print(ADDON_NAME_COLOR .. "Saved profiles:")
+            for _, name in ipairs(list) do
+                print("  |cFF00FF00" .. name .. "|r")
+            end
+        end
+
     else
         print(ADDON_NAME_COLOR .. "Available commands:")
         print("|cFFFFFF00o|r || |cFFFFFF00opt|r || |cFFFFFF00options|r || |cFFFFFF00config|r - opens options window")
         print("|cFFFFFF00p|r || |cFFFFFF00cpu|r - prints cpu usage")
+        print("|cFFFFFF00drag|r || |cFFFFFF00unlock|r || |cFFFFFF00lock|r || |cFFFFFF00move|r - toggle drag mode")
+        print("|cFFFFFF00save <name>|r - save current layout as profile")
+        print("|cFFFFFF00load <name>|r - load profile")
+        print("|cFFFFFF00delete <name>|r - delete profile")
+        print("|cFFFFFF00profiles|r || |cFFFFFF00list|r - list saved profiles")
     end
 end

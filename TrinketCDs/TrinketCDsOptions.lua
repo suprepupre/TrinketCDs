@@ -10,6 +10,9 @@ local DEFAULT_TRINKET_SWAP_LINK = "|cffffffff|Hitem:10725:0:0:0:0:0:0:0:80|h[Gno
 local OPTIONS_FRAME = CreateFrame("Frame")
 ADDON.OPTIONS = OPTIONS_FRAME
 
+-- Store slider references for updating after drag
+OPTIONS_FRAME.item_sliders = {}
+
 local MARGIN = 16
 local SLIDERS = {
     ICON_SIZE = {
@@ -183,7 +186,31 @@ local function new_slider(parent_frame, option_name, properties)
         parent_frame.item_frame:RedrawFrame()
     end)
 
+    -- Store reference for updating after drag
+    local slot_ID = parent_frame.item_frame.slot_ID
+    if not OPTIONS_FRAME.item_sliders[slot_ID] then
+        OPTIONS_FRAME.item_sliders[slot_ID] = {}
+    end
+    OPTIONS_FRAME.item_sliders[slot_ID][option_name] = slider
+
     return slider
+end
+
+-- Function to update sliders after drag & drop
+function OPTIONS_FRAME:UpdateSliders(slot_ID)
+    local sliders = self.item_sliders[slot_ID]
+    if not sliders then return end
+
+    local frame = FRAMES[slot_ID]
+    if not frame then return end
+
+    for option_name, slider in pairs(sliders) do
+        local value = frame.settings[option_name]
+        if value then
+            slider:SetValue(value)
+            slider.EditBox:SetText(value)
+        end
+    end
 end
 
 local function redraw_all()
@@ -344,6 +371,164 @@ local function add_trinket_swap_edit_box(config_frame)
     end)
 end
 
+-- ============================================================
+-- Profile UI section
+-- ============================================================
+function OPTIONS_FRAME:add_profile_settings()
+    local config_frame = CreateFrame("Frame", nil, self)
+    config_frame.name = "Profiles"
+    config_frame.parent = self.main_options.name
+
+    local title = config_frame:CreateFontString(nil, nil, "GameFontNormalLarge")
+    title:SetPoint("TOPLEFT", MARGIN, -MARGIN)
+    title:SetText("Profiles & Drag Mode")
+
+    -- Drag unlock button
+    local yOffset = -MARGIN * 3
+
+    local drag_info = config_frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    drag_info:SetPoint("TOPLEFT", MARGIN, yOffset)
+    drag_info:SetText("Drag mode allows you to move icons by dragging them.")
+    yOffset = yOffset - 22
+
+    local dragBtn = CreateFrame("Button", ADDON_NAME.."DragBtn", config_frame, "UIPanelButtonTemplate")
+    dragBtn:SetPoint("TOPLEFT", MARGIN, yOffset)
+    dragBtn:SetSize(220, 24)
+    dragBtn:SetText("Toggle Drag Mode (/tcd drag)")
+    dragBtn:SetScript("OnClick", function()
+        ADDON:ToggleDragUnlock()
+    end)
+    yOffset = yOffset - 40
+
+    -- Separator
+    local sep1 = config_frame:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+    sep1:SetPoint("TOPLEFT", MARGIN, yOffset)
+    sep1:SetText("Save / Load Profiles")
+    yOffset = yOffset - 25
+
+    local profile_info = config_frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    profile_info:SetPoint("TOPLEFT", MARGIN, yOffset)
+    profile_info:SetText("Select existing profile from dropdown or type a new name below.")
+    yOffset = yOffset - 25
+
+    -- Profile dropdown
+    local profileDropDown = CreateFrame("Frame", ADDON_NAME.."ProfileDropDown", config_frame, "UIDropDownMenuTemplate")
+    profileDropDown:SetPoint("TOPLEFT", MARGIN - 16, yOffset)
+    UIDropDownMenu_SetWidth(profileDropDown, 200)
+
+    -- Profile name edit box
+    local eb_label = config_frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    eb_label:SetPoint("TOPLEFT", MARGIN, yOffset - 35)
+    eb_label:SetText("Profile name:")
+
+    local profile_eb = CreateFrame("EditBox", ADDON_NAME.."ProfileName", config_frame, "InputBoxTemplate")
+    profile_eb:SetPoint("LEFT", eb_label, "RIGHT", 10, 0)
+    profile_eb:SetSize(150, 20)
+    profile_eb:SetMultiLine(false)
+    profile_eb:SetAutoFocus(false)
+    profile_eb:ClearFocus()
+    profile_eb:SetScript("OnEscapePressed", profile_eb.ClearFocus)
+    profile_eb:SetScript("OnEnterPressed", profile_eb.ClearFocus)
+    yOffset = yOffset - 70
+
+    local function ProfileDropDown_OnClick(self_btn)
+        profile_eb:SetText(self_btn.value)
+        UIDropDownMenu_SetText(profileDropDown, self_btn.value)
+    end
+
+    local function ProfileDropDown_Init()
+        local list = ADDON:GetProfileList()
+        local info = UIDropDownMenu_CreateInfo()
+        for _, name in ipairs(list) do
+            info.text = name
+            info.value = name
+            info.func = ProfileDropDown_OnClick
+            UIDropDownMenu_AddButton(info)
+        end
+        if #list == 0 then
+            info.text = "(no profiles)"
+            info.value = ""
+            info.disabled = true
+            UIDropDownMenu_AddButton(info)
+        end
+    end
+
+    UIDropDownMenu_Initialize(profileDropDown, ProfileDropDown_Init)
+    UIDropDownMenu_SetText(profileDropDown, "Select profile...")
+
+    -- Refresh dropdown every time the options panel is shown
+    config_frame:SetScript("OnShow", function()
+        UIDropDownMenu_Initialize(profileDropDown, ProfileDropDown_Init)
+        UIDropDownMenu_SetText(profileDropDown, "Select profile...")
+    end)
+
+    -- Buttons
+    local saveBtn = CreateFrame("Button", ADDON_NAME.."SaveProfileBtn", config_frame, "UIPanelButtonTemplate")
+    saveBtn:SetPoint("TOPLEFT", MARGIN, yOffset)
+    saveBtn:SetSize(100, 24)
+    saveBtn:SetText("Save")
+    saveBtn:SetScript("OnClick", function()
+        local name = strtrim(profile_eb:GetText())
+        if name == "" then
+            print("|cFFFFFF00[TrinketCDs]|r: Enter a profile name first.")
+            return
+        end
+        ADDON:SaveCurrentProfile(name)
+    end)
+
+    local loadBtn = CreateFrame("Button", ADDON_NAME.."LoadProfileBtn", config_frame, "UIPanelButtonTemplate")
+    loadBtn:SetPoint("LEFT", saveBtn, "RIGHT", 8, 0)
+    loadBtn:SetSize(100, 24)
+    loadBtn:SetText("Load")
+    loadBtn:SetScript("OnClick", function()
+        local name = strtrim(profile_eb:GetText())
+        if name == "" then
+            print("|cFFFFFF00[TrinketCDs]|r: Enter a profile name first.")
+            return
+        end
+        ADDON:LoadProfile(name)
+        for slot_ID in pairs(FRAMES) do
+            OPTIONS_FRAME:UpdateSliders(slot_ID)
+        end
+    end)
+
+    local deleteBtn = CreateFrame("Button", ADDON_NAME.."DeleteProfileBtn", config_frame, "UIPanelButtonTemplate")
+    deleteBtn:SetPoint("LEFT", loadBtn, "RIGHT", 8, 0)
+    deleteBtn:SetSize(100, 24)
+    deleteBtn:SetText("Delete")
+    deleteBtn:SetScript("OnClick", function()
+        local name = strtrim(profile_eb:GetText())
+        if name == "" then
+            print("|cFFFFFF00[TrinketCDs]|r: Enter a profile name first.")
+            return
+        end
+        ADDON:DeleteProfile(name)
+    end)
+    yOffset = yOffset - 40
+
+    -- Usage hints
+    local hints_title = config_frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    hints_title:SetPoint("TOPLEFT", MARGIN, yOffset)
+    hints_title:SetText("Chat commands:")
+    yOffset = yOffset - 18
+
+    local hints = {
+        "|cFFFFFF00/tcd save <name>|r - save current layout",
+        "|cFFFFFF00/tcd load <name>|r - load profile",
+        "|cFFFFFF00/tcd delete <name>|r - delete profile",
+        "|cFFFFFF00/tcd profiles|r - list all profiles",
+        "|cFFFFFF00/tcd drag|r - toggle drag mode",
+    }
+    for _, hint_text in ipairs(hints) do
+        local hint = config_frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+        hint:SetPoint("TOPLEFT", MARGIN + 10, yOffset)
+        hint:SetText(hint_text)
+        yOffset = yOffset - 15
+    end
+
+    InterfaceOptions_AddCategory(config_frame)
+end
+
 function OPTIONS_FRAME:OnEvent(event, arg1)
     if arg1 ~= ADDON_NAME then return end
 
@@ -361,16 +546,19 @@ function OPTIONS_FRAME:OnEvent(event, arg1)
 
     add_trinket_swap_edit_box(config_frame)
 
-    if not LSM then return end
+    if LSM then
+        local font_font = config_frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        font_font:SetPoint("TOPLEFT", MARGIN, -MARGIN * 2 * 13.25)
+        font_font:SetText("Font:")
 
-    local font_font = config_frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    font_font:SetPoint("TOPLEFT", MARGIN, -MARGIN * 2 * 13.25)
-    font_font:SetText("Font:")
+        dropDown = CreateFrame("Frame", "WPDemoDropDown", config_frame, "UIDropDownMenuTemplate")
+        dropDown:SetPoint("TOPLEFT", MARGIN * 3, -MARGIN * 2 * 13)
+        UIDropDownMenu_SetWidth(dropDown, 200)
+        UIDropDownMenu_Initialize(dropDown, WPDropDownDemo_Menu)
+    end
 
-    dropDown = CreateFrame("Frame", "WPDemoDropDown", config_frame, "UIDropDownMenuTemplate")
-    dropDown:SetPoint("TOPLEFT", MARGIN * 3, -MARGIN * 2 * 13)
-    UIDropDownMenu_SetWidth(dropDown, 200)
-    UIDropDownMenu_Initialize(dropDown, WPDropDownDemo_Menu)
+    -- Profiles as separate subcategory
+    self:add_profile_settings()
 end
 
 OPTIONS_FRAME:RegisterEvent("ADDON_LOADED")

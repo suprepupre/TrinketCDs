@@ -1,11 +1,11 @@
 ## Interface: 30300
 ## Title:|cffee0080TrinketCDs|r
 ## Author: Ridepad (|cff888888Ridepad#7722|r)
-## Version: 2.3.0
-## SavedVariables: TrinketCDsProfile
+## Version: 2.4.0
+## SavedVariables: TrinketCDsProfile, TrinketCDsProfiles
 ## SavedVariablesPerCharacter: TrinketCDsProfileChar
-## Notes: Trinkets and item enchants proc tracker.
-## Notes-ruRU: Отслеживает баффы предметов и энчантов.
+## Notes: Trinkets and item enchants proc tracker. Drag & Drop + Profiles.
+## Notes-ruRU: Отслеживает баффы предметов и энчантов. Drag & Drop + Профили.
 ## OptionalDeps: OmniCC, LibSharedMedia-3.0
 
 ## X-Category: Combat
