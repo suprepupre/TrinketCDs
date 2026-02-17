@@ -180,7 +180,11 @@ local GetPlayerBuff = (function()
         local _, _, _, stacks, _, duration, expirationTime, _, _, _, buffSpellID = UnitBuff("player", buff_index)
         return stacks, duration, expirationTime, buffSpellID
     end
-    return AuraUtil and retail or old
+    -- Check actual WoW version, not AuraUtil existence
+    -- CompactRaidFrame addon creates AuraUtil in 3.3.5a which breaks detection
+    local _, _, _, tocVersion = GetBuildInfo()
+    local isRetail = tocVersion and tocVersion > 40000
+    return isRetail and retail or old
 end)()
 
 local function player_buff(spell_ID)
