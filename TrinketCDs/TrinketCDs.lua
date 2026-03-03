@@ -28,13 +28,113 @@ local InCombatLockdown = InCombatLockdown
 local IsModifierKeyDown = IsModifierKeyDown
 local UnitAffectingCombat = UnitAffectingCombat
 local GetInventoryItemCooldown = GetInventoryItemCooldown
-local GetContainerNumFreeSlots = GetContainerNumFreeSlots or C_Container and C_Container.GetContainerNumFreeSlots
+local GetContainerNumFreeSlots = GetContainerNumFreeSlots or (C_Container and C_Container.GetContainerNumFreeSlots)
 
--- ============================================================
--- Drag & Drop state
--- ============================================================
-local DRAG_UNLOCK = false  -- global unlock toggle
 ADDON.DRAG_UNLOCK = false
+
+local LCG = LibStub and LibStub("LibCustomGlow-1.0", true)
+
+local GLOW_STYLE_BUTTON = 1
+local GLOW_STYLE_PIXEL = 2
+local GLOW_FREQUENCY = 0.25
+local GLOW_FRAMELEVEL = 20
+local PIXEL_KEY = "TCD"
+local PIXEL_LINES = 8
+local PIXEL_LENGTH = 10
+local PIXEL_THICKNESS = 1
+
+local function ButtonGlow_Update(r)
+    local f = r and r._ButtonGlow
+    if not f then return end
+
+    local width, height = r:GetSize()
+    f:SetFrameLevel(r:GetFrameLevel() + GLOW_FRAMELEVEL)
+    f:SetSize(width * 1.4, height * 1.4)
+    f:ClearAllPoints()
+    f:SetPoint("TOPLEFT", r, "TOPLEFT", -width * 0.2, height * 0.2)
+    f:SetPoint("BOTTOMRIGHT", r, "BOTTOMRIGHT", width * 0.2, -height * 0.2)
+
+    if f.ants then
+        f.ants:SetSize(width * 1.4 * 0.85, height * 1.4 * 0.85)
+    end
+
+    f.throttle = (GLOW_FREQUENCY and GLOW_FREQUENCY > 0) and (0.25 / GLOW_FREQUENCY * 0.01) or 0.01
+end
+
+local function StopGlow(self)
+    if not (LCG and self and self._tcd_glow_active) then return end
+
+    if self._tcd_glow_style_active == GLOW_STYLE_PIXEL then
+        if LCG.PixelGlow_Stop then
+            LCG.PixelGlow_Stop(self, PIXEL_KEY)
+        end
+    else
+        if LCG.ButtonGlow_Stop then
+            LCG.ButtonGlow_Stop(self)
+        end
+    end
+
+    self._tcd_glow_active = false
+    self._tcd_glow_style_active = nil
+end
+
+local function StartGlow(self)
+    if not (LCG and self and self.item and self.item.applied and SWITCHES.SHOW_PROC_GLOW ~= 0 and (self.settings.PROC_GLOW == nil or self.settings.PROC_GLOW ~= 0)) then return end
+
+    local style = SWITCHES.PROC_GLOW_STYLE or GLOW_STYLE_BUTTON
+
+    if style == GLOW_STYLE_PIXEL then
+        if LCG.PixelGlow_Start then
+            LCG.PixelGlow_Start(self, nil, PIXEL_LINES, GLOW_FREQUENCY, PIXEL_LENGTH, PIXEL_THICKNESS, 0, 0, nil, PIXEL_KEY, GLOW_FRAMELEVEL)
+        end
+    else
+        if LCG.ButtonGlow_Start then
+            LCG.ButtonGlow_Start(self, nil, GLOW_FREQUENCY, GLOW_FRAMELEVEL)
+        end
+    end
+
+    self._tcd_glow_active = true
+    self._tcd_glow_style_active = style
+end
+
+local function ShowProcVisuals(self, procSpellID)
+    local wantGlow = (SWITCHES.SHOW_PROC_GLOW ~= 0)
+    and (self.item and self.item.applied)
+    and (self.settings.PROC_GLOW == nil or self.settings.PROC_GLOW ~= 0)
+    local style = SWITCHES.PROC_GLOW_STYLE or GLOW_STYLE_BUTTON
+
+    if LCG and wantGlow then
+        if (not self._tcd_glow_active) or (self._tcd_glow_style_active ~= style) then
+            StopGlow(self)
+            StartGlow(self)
+        else
+            if style == GLOW_STYLE_BUTTON then
+                ButtonGlow_Update(self)
+            end
+        end
+    else
+        StopGlow(self)
+    end
+
+    if SWITCHES.SHOW_PROC_ICON ~= 0 and procSpellID then
+        local procIcon = select(3, GetSpellInfo(procSpellID))
+        if procIcon then
+            self.texture:SetTexture(procIcon)
+            return
+        end
+    end
+
+    if self.item and self.item.texture then
+        self.texture:SetTexture(self.item.texture)
+    end
+end
+
+local function HideProcVisuals(self)
+    StopGlow(self)
+    if self.item and self.item.texture then
+        self.texture:SetTexture(self.item.texture)
+    end
+end
 
 local function new_item(item_ID)
     if not item_ID then return end
@@ -117,7 +217,8 @@ local function get_item(self)
 
         return new_not_trinket(item_ID, buff_ID)
 
-    elseif item then return item
+    elseif item then
+        return item
 
     elseif self.item_proc_type == "trinket" then
         return new_trinket(item_ID)
@@ -132,6 +233,7 @@ local function get_item(self)
 end
 
 local function ResetFrame(self)
+    HideProcVisuals(self)
     self.cooldown_current_end = nil
     self.stacks_text:SetText()
     self.texture:SetDesaturated(false)
@@ -160,8 +262,7 @@ local function ItemUsedCheck(self)
 
     if cdDur > 30 then
         self.item.CD = cdDur
-        if self.item.ID == ADDON.TRINKET_SWAP_ID and self.item_ID_before_swap
-        and GetTime() - cdStart < 5 then
+        if self.item.ID == ADDON.TRINKET_SWAP_ID and self.item_ID_before_swap and GetTime() - cdStart < 5 then
             EquipItemByName(self.item_ID_before_swap, self.slot_ID)
         end
     end
@@ -180,8 +281,6 @@ local GetPlayerBuff = (function()
         local _, _, _, stacks, _, duration, expirationTime, _, _, _, buffSpellID = UnitBuff("player", buff_index)
         return stacks, duration, expirationTime, buffSpellID
     end
-    -- Check actual WoW version, not AuraUtil existence
-    -- CompactRaidFrame addon creates AuraUtil in 3.3.5a which breaks detection
     local _, _, _, tocVersion = GetBuildInfo()
     local isRetail = tocVersion and tocVersion > 40000
     return isRetail and retail or old
@@ -192,7 +291,7 @@ local function player_buff(spell_ID)
     repeat
         local stacks, duration, expirationTime, buffSpellID = GetPlayerBuff(buff_index)
         if buffSpellID == spell_ID then
-            return stacks, duration, expirationTime
+            return stacks, duration, expirationTime, buffSpellID
         end
         buff_index = buff_index + 1
     until not buffSpellID
@@ -203,7 +302,7 @@ local function player_buff_multi(spell_IDs)
     repeat
         local stacks, duration, expirationTime, buffSpellID = GetPlayerBuff(buff_index)
         if spell_IDs[buffSpellID] then
-            return stacks, duration, expirationTime
+            return stacks, duration, expirationTime, buffSpellID
         end
         buff_index = buff_index + 1
     until not buffSpellID
@@ -240,7 +339,7 @@ local function check_proc(item)
     end
 end
 
-local function ItemBuffApplied(self, duration, expirationTime)
+local function ItemBuffApplied(self, duration, expirationTime, procSpellID)
     local cd_start = expirationTime - duration
     local item = self.item
     item.applied = true
@@ -253,11 +352,14 @@ local function ItemBuffApplied(self, duration, expirationTime)
     self.cooldown:SetReverse(true)
     self.cooldown:SetCooldown(cd_start, duration)
     self.cooldown_current_end = expirationTime
+    self.last_proc_spell_id = procSpellID
     self:ToggleVisibility()
+    ShowProcVisuals(self, procSpellID)
 end
 
 local function ItemBuffFaded(self)
     self.item.applied = false
+    HideProcVisuals(self)
     if self.no_swap_cd then
         self:ResetFrame()
     elseif self.is_usable then
@@ -270,16 +372,21 @@ end
 local function AuraCheck(self, swapped)
     if not self.item then return end
 
-    local stacks, duration, expiration = check_proc(self.item)
+    local stacks, duration, expiration, procSpellID = check_proc(self.item)
     if duration == 0 then
         self.item.applied = true
         self.stacks_text:SetText(stacks)
+        self.last_proc_spell_id = procSpellID
+        ShowProcVisuals(self, procSpellID)
     elseif duration then
         if stacks ~= 0 then
             self.stacks_text:SetText(stacks)
         end
         if swapped or expiration ~= self.item.buff_end then
-            self:ItemBuffApplied(duration, expiration)
+            self:ItemBuffApplied(duration, expiration, procSpellID)
+        else
+            self.last_proc_spell_id = procSpellID
+            ShowProcVisuals(self, procSpellID)
         end
     elseif self.item.applied then
         self:ItemBuffFaded()
@@ -300,8 +407,8 @@ end
 local function ToggleButton(self)
     if not self.button then return end
 
-    if SWITCHES.USE_ON_CLICK ~= 0 and self.is_usable
-    or self.item and self.item.ID == ADDON.TRINKET_SWAP_ID then
+    if (SWITCHES.USE_ON_CLICK ~= 0 and self.is_usable)
+    or (self.item and self.item.ID == ADDON.TRINKET_SWAP_ID) then
         self.button:Show()
     else
         self.button:Hide()
@@ -337,10 +444,7 @@ local function ItemUpdate(self)
 end
 
 local function ItemChanged(self)
-    if not self.item
-    or self.no_swap_cd
-    or self.is_usable
-    or not self.item.proc_in_DB then return end
+    if not self.item or self.no_swap_cd or self.is_usable or not self.item.proc_in_DB then return end
 
     local now = GetTime()
     if SWITCHES.FORCE30 == 0 then
@@ -356,9 +460,6 @@ local function ItemChanged(self)
     end
 end
 
--- ============================================================
--- Drag & Drop functions
--- ============================================================
 local function OnDragStart(self)
     if InCombatLockdown() then return end
     if not ADDON.DRAG_UNLOCK then return end
@@ -371,7 +472,6 @@ local function OnDragStop(self)
     self:StopMovingOrSizing()
     self.isMoving = false
 
-    -- Save position relative to CENTER of UIParent
     local scale = self:GetEffectiveScale()
     local uiScale = UIParent:GetEffectiveScale()
     local cx, cy = self:GetCenter()
@@ -383,7 +483,6 @@ local function OnDragStop(self)
     self.settings.POS_X = floor(posX + 0.5)
     self.settings.POS_Y = floor(posY + 0.5)
 
-    -- Update sliders in options if they exist
     if ADDON.OPTIONS and ADDON.OPTIONS.UpdateSliders then
         ADDON.OPTIONS:UpdateSliders(self.slot_ID)
     end
@@ -397,11 +496,9 @@ local function SetupDragForFrame(self)
     self:SetScript("OnDragStop", OnDragStop)
 end
 
--- ============================================================
-
 local function OnMouseDown(self, button)
     self = self.parent or self
-    if ADDON.DRAG_UNLOCK then return end -- don't process clicks while in drag mode
+    if ADDON.DRAG_UNLOCK then return end
     if InCombatLockdown() then
         if not IsModifierKeyDown() then return end
         print(ADDON_NAME_COLOR .. "Leave combat to swap items")
@@ -415,14 +512,12 @@ local function OnMouseDown(self, button)
                     return i == 0 and PutItemInBackpack() or PutItemInBag(i+CONTAINER_BAG_OFFSET)
                 end
             end
-
         elseif IsShiftKeyDown() then
             if self.slot_ID == 13 then
                 EquipItemByName(self.item.ID, 14)
             elseif self.slot_ID == 14 then
                 EquipItemByName(self.item.ID, 13)
             end
-
         elseif IsAltKeyDown() then
             local item_name = GetItemInfo(self.item.ID)
             EquipItemByName(item_name, self.slot_ID)
@@ -439,6 +534,27 @@ local function OnMouseDown(self, button)
     end
 end
 
+local function PlayerInCombat()
+    return UnitAffectingCombat("player") or UnitGUID("boss1")
+end
+
+local function ToggleVisibility(self)
+    if not self.item or (self.button and InCombatLockdown()) then return end
+
+    if ADDON.DRAG_UNLOCK then
+        self:Show()
+        return
+    end
+
+    if self.settings.SHOW == 0
+    or (SWITCHES.COMBAT_ONLY ~= 0 and not PlayerInCombat())
+    or (SWITCHES.HIDE_READY ~= 0 and not self.cooldown_current_end) then
+        self:Hide()
+    else
+        self:Show()
+    end
+end
+
 local function OnEvent(self, event, arg1, arg2)
     if event == "UNIT_AURA" then
         if arg1 ~= "player" then return end
@@ -447,20 +563,16 @@ local function OnEvent(self, event, arg1, arg2)
         self:ResetFrame()
     elseif event == "BAG_UPDATE_COOLDOWN" then
         self:ItemUsedCheck()
-
     elseif event == "MODIFIER_STATE_CHANGED" then
         if InCombatLockdown() then return end
-        if ADDON.DRAG_UNLOCK then return end -- don't toggle mouse in drag mode
+        if ADDON.DRAG_UNLOCK then return end
         self:EnableMouse(arg2 == 1)
-
     elseif event == "PLAYER_REGEN_DISABLED" then
         self:ToggleVisibility()
         self:UnregisterEvent("MODIFIER_STATE_CHANGED")
-
     elseif event == "PLAYER_REGEN_ENABLED" then
         self:ToggleVisibility()
         self:RegisterEvent("MODIFIER_STATE_CHANGED")
-
     elseif event == "ITEM_UNLOCKED" then
         if not self.swap_back_item_id then return end
         EquipItemByName(self.swap_back_item_id, self.slot_ID)
@@ -488,8 +600,8 @@ end
 
 local function new_font_overlay(parent)
     local font = parent:CreateFontString(nil, "OVERLAY")
-	font:SetShadowColor(0, 0, 0, 1)
-	font:SetShadowOffset(1, -1)
+    font:SetShadowColor(0, 0, 0, 1)
+    font:SetShadowOffset(1, -1)
     return font
 end
 
@@ -566,30 +678,12 @@ local function RedrawFrame(self)
     self:ClearAllPoints()
     self:SetPoint("CENTER", UIParent, "CENTER", self.settings.POS_X, self.settings.POS_Y)
 
+    if self._tcd_glow_active and self._tcd_glow_style_active == GLOW_STYLE_BUTTON then
+        ButtonGlow_Update(self)
+    end
+
     self:ToggleButton()
     self:ToggleVisibility()
-end
-
-local function PlayerInCombat()
-    return UnitAffectingCombat("player") or UnitGUID("boss1")
-end
-
-local function ToggleVisibility(self)
-    if not self.item or self.button and InCombatLockdown() then return end
-
-    -- Always show when drag is unlocked
-    if ADDON.DRAG_UNLOCK then
-        self:Show()
-        return
-    end
-
-    if self.settings.SHOW == 0
-    or SWITCHES.COMBAT_ONLY ~= 0 and not PlayerInCombat()
-    or SWITCHES.HIDE_READY ~= 0 and not self.cooldown_current_end then
-        self:Hide()
-    else
-        self:Show()
-    end
 end
 
 local function add_functions(self)
@@ -657,7 +751,6 @@ local function CreateNewItemFrame(slot_ID)
     add_text_layer(self)
     add_functions(self)
 
-    -- Setup drag & drop
     SetupDragForFrame(self)
 
     self:RedrawFrame()
@@ -667,10 +760,9 @@ end
 
 local function update_settings(svars_table, settings_table)
     if not svars_table then return end
-
     for old_table_key in pairs(settings_table) do
         local new_table_value = svars_table[old_table_key]
-        if new_table_value then
+        if new_table_value ~= nil then
             settings_table[old_table_key] = new_table_value
         end
     end
@@ -679,7 +771,6 @@ end
 local function update_nested_settings(svars, key)
     local _svars = svars[key]
     if not _svars then return end
-
     for item_slot_id, settings_item in pairs(SETTINGS[key]) do
         update_settings(_svars[item_slot_id], settings_item)
     end
@@ -688,6 +779,7 @@ end
 local function is_trinket(item_id)
     return item_id and select(9, GetItemInfo(item_id)) == "INVTYPE_TRINKET"
 end
+
 local function set_trinket_swap_id()
     local char_profile = _G["TrinketCDsProfileChar"]
     if not char_profile then return end
@@ -701,15 +793,6 @@ local function set_trinket_swap_id()
     ADDON.TRINKET_SWAP_ID = tonumber(item_id)
 end
 
--- ============================================================
--- Profile system
--- ============================================================
-local function GetCharacterKey()
-    local name = UnitName("player")
-    local realm = GetRealmName()
-    return name and realm and (name .. " - " .. realm) or nil
-end
-
 function ADDON:SaveCurrentProfile(profileName)
     if not profileName then return end
     if not _G.TrinketCDsProfiles then
@@ -717,7 +800,6 @@ function ADDON:SaveCurrentProfile(profileName)
     end
     local profiles = _G.TrinketCDsProfiles
 
-    -- Deep copy current settings
     local saved = { ITEMS = {}, SWITCHES = {} }
     for slot_ID, settings in pairs(SETTINGS.ITEMS) do
         saved.ITEMS[slot_ID] = {}
@@ -757,9 +839,9 @@ function ADDON:LoadProfile(profileName)
         end
     end
 
-    -- Redraw all frames
     for _, frame in pairs(self.FRAMES) do
         frame:RedrawFrame()
+        frame:AuraCheck(true)
     end
 
     print(ADDON_NAME_COLOR .. format("Profile '%s' loaded.", profileName))
@@ -798,9 +880,7 @@ function ADDON:ToggleDragUnlock()
     for _, frame in pairs(self.FRAMES) do
         frame:EnableMouse(ADDON.DRAG_UNLOCK)
         if ADDON.DRAG_UNLOCK then
-            -- Show all frames for positioning
             frame:Show()
-            -- Show a highlight border
             if not frame.drag_highlight then
                 frame.drag_highlight = frame:CreateTexture(nil, "HIGHLIGHT")
                 frame.drag_highlight:SetAllPoints()
@@ -822,29 +902,27 @@ function ADDON:ToggleDragUnlock()
     end
 end
 
--- ============================================================
-
 function ADDON:OnEvent(event, arg1)
     if event == "ADDON_LOADED" then
         if arg1 ~= ADDON_NAME then return end
 
-        -- Initialize profiles storage
         if not _G.TrinketCDsProfiles then
             _G.TrinketCDsProfiles = {}
         end
 
-        -- Initialize per-character profile storage
         if not _G.TrinketCDsProfileChar then
             _G.TrinketCDsProfileChar = {}
         end
 
-        -- Load per-character settings if they exist, otherwise use account-wide
         local char_settings = _G.TrinketCDsProfileChar.SETTINGS
         local svars = char_settings or _G[ADDON_PROFILE]
 
         if svars then
             update_nested_settings(svars, "ITEMS")
             update_settings(svars.SWITCHES, SWITCHES)
+            if svars.SWITCHES and svars.SWITCHES.SHOW_GLOW ~= nil and svars.SWITCHES.SHOW_PROC_GLOW == nil then
+                SWITCHES.SHOW_PROC_GLOW = svars.SWITCHES.SHOW_GLOW
+            end
         end
 
         _G[ADDON_PROFILE] = SETTINGS
@@ -856,7 +934,6 @@ function ADDON:OnEvent(event, arg1)
         set_trinket_swap_id()
 
     elseif event == "PLAYER_LOGOUT" then
-        -- Auto-save current settings per-character on logout
         if not _G.TrinketCDsProfileChar then
             _G.TrinketCDsProfileChar = {}
         end
@@ -878,9 +955,6 @@ ADDON:RegisterEvent("ADDON_LOADED")
 ADDON:RegisterEvent("PLAYER_LOGOUT")
 ADDON:SetScript("OnEvent", ADDON.OnEvent)
 
-ADDON:RegisterEvent("ADDON_LOADED")
-ADDON:SetScript("OnEvent", ADDON.OnEvent)
-
 SLASH_RIDEPAD_TRINKETS1 = "/tcd"
 function SlashCmdList.RIDEPAD_TRINKETS(arg)
     if arg == "p" or arg == "cpu" then
@@ -896,25 +970,19 @@ function SlashCmdList.RIDEPAD_TRINKETS(arg)
             msg = format("%s\n%.3fs | %d function calls", msg, t / 1000, c)
         end
         print(msg)
-
     elseif arg == "o" or arg == "opt" or arg == "options" or arg == "config" then
-		InterfaceOptionsFrame_OpenToCategory(ADDON_NAME)
-
+        InterfaceOptionsFrame_OpenToCategory(ADDON_NAME)
     elseif arg == "drag" or arg == "unlock" or arg == "lock" or arg == "move" then
         ADDON:ToggleDragUnlock()
-
     elseif arg:match("^save ") then
         local profileName = arg:match("^save (.+)$")
         ADDON:SaveCurrentProfile(strtrim(profileName))
-
     elseif arg:match("^load ") then
         local profileName = arg:match("^load (.+)$")
         ADDON:LoadProfile(strtrim(profileName))
-
     elseif arg:match("^delete ") then
         local profileName = arg:match("^delete (.+)$")
         ADDON:DeleteProfile(strtrim(profileName))
-
     elseif arg == "profiles" or arg == "list" then
         local list = ADDON:GetProfileList()
         if #list == 0 then
@@ -925,7 +993,6 @@ function SlashCmdList.RIDEPAD_TRINKETS(arg)
                 print("  |cFF00FF00" .. name .. "|r")
             end
         end
-
     else
         print(ADDON_NAME_COLOR .. "Available commands:")
         print("|cFFFFFF00o|r || |cFFFFFF00opt|r || |cFFFFFF00options|r || |cFFFFFF00config|r - opens options window")

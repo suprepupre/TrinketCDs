@@ -496,6 +496,7 @@ local default_item_settings_table = function(x, y, size, edge, ilvl)
         CD_SIZE = 40,
         ILVL_SIZE = 25,
         STACKS_SIZE = 50,
+        PROC_GLOW = 1,
     }
 end
 
@@ -518,5 +519,8 @@ DB.DEFAULT_SETTINGS = {
         STACKS_BOTTOM = 0,
         SHOW_DECIMALS = 0,
         FORCE30 = 0,
+        SHOW_PROC_GLOW = 1,
+        SHOW_PROC_ICON = 1,
+        PROC_GLOW_STYLE = 1,
     },
 }

@@ -1,6 +1,7 @@
 local ADDON_NAME = "TrinketCDs"
 local ADDON_OPTIONS = "TrinketCDsOptions"
 local ADDON = _G[ADDON_NAME]
+local DB = _G.TrinketCDsDB
 local FRAMES = ADDON.FRAMES
 local SWITCHES = ADDON.SETTINGS.SWITCHES
 local SLIDER_NAME = ADDON_OPTIONS .. "%sSlider%s"
@@ -10,20 +11,13 @@ local DEFAULT_TRINKET_SWAP_LINK = "|cffffffff|Hitem:10725:0:0:0:0:0:0:0:80|h[Gno
 local OPTIONS_FRAME = CreateFrame("Frame")
 ADDON.OPTIONS = OPTIONS_FRAME
 
--- Store slider references for updating after drag
 OPTIONS_FRAME.item_sliders = {}
 
 local MARGIN = 16
 local SLIDERS = {
-    ICON_SIZE = {
-        row = 1,
-        label = "Icon size",
-        min = 20, max = 75,
-    },
+    ICON_SIZE = { row = 1, label = "Icon size", min = 20, max = 75 },
     POS_X = {
-        row = 2,
-        label = "Icon X",
-        min = -2000, max = 2000,
+        row = 2, label = "Icon X", min = -2000, max = 2000,
         func = function(self)
             local w = floor(GetScreenWidth() / 2)
             self:SetMinMaxValues(-w, w)
@@ -31,75 +25,44 @@ local SLIDERS = {
         end
     },
     POS_Y = {
-        row = 3,
-        label = "Icon Y",
-        min = -2000, max = 2000,
+        row = 3, label = "Icon Y", min = -2000, max = 2000,
         func = function(self)
             local h = floor(GetScreenHeight() / 2)
             self:SetMinMaxValues(-h, h)
             self.EditBox:Show()
         end
     },
-    ZOOM = {
-        row = 4,
-        label = "Icon zoom %",
-        min = -200, max = 300, step = 5,
-    },
-    BORDER_MARGIN = {
-        row = 5,
-        label = "Border margin",
-        min = -5, max = 5,
-    },
-    EDGE_SIZE = {
-        row = 6,
-        label = "Border edge",
-        min = 1, max = 30,
-    },
-    ILVL_SIZE = {
-        row = 7,
-        label = "Item level font size %",
-        min = 0, max = 100, step = 5,
-    },
-    STACKS_SIZE = {
-        row = 8,
-        label = "Stacks font size %",
-        min = 0, max = 100, step = 5,
-    },
-    CD_SIZE = {
-        row = 9,
-        label = "Cooldown font size %",
-        min = 0, max = 100, step = 5,
-    },
+    ZOOM = { row = 4, label = "Icon zoom %", min = -200, max = 300, step = 5 },
+    BORDER_MARGIN = { row = 5, label = "Border margin", min = -5, max = 5 },
+    EDGE_SIZE = { row = 6, label = "Border edge", min = 1, max = 30 },
+    ILVL_SIZE = { row = 7, label = "Item level font size %", min = 0, max = 100, step = 5 },
+    STACKS_SIZE = { row = 8, label = "Stacks font size %", min = 0, max = 100, step = 5 },
+    CD_SIZE = { row = 9, label = "Cooldown font size %", min = 0, max = 100, step = 5 },
 }
 
 local CB_DEFAULTS_MAIN = {
-    COMBAT_ONLY = {
-        row = 1,
-        label = "Hide out of combat",
-    },
-    HIDE_READY = {
-        row = 2,
-        label = "Hide if ready (doesn't work with option below)",
-    },
-    USE_ON_CLICK = {
-        row = 3,
-        label = "Enable item activation with mouse (requires /reload)",
-    },
-    STACKS_BOTTOM = {
-        row = 4,
-        label = "Move stacks to the bottom of the frame",
-    },
-    SHOW_DECIMALS = {
-        row = 5,
-        label = "Show cooldown decimal (for built-in cooldown)",
-        skip = true,
-    },
-    FORCE30 = {
-        row = 6,
-        label = "Force 30 seconds iCD on swap",
-        skip = true,
-    },
+    COMBAT_ONLY = { row = 1, label = "Hide out of combat" },
+    HIDE_READY = { row = 2, label = "Hide if ready (doesn't work with option below)" },
+    USE_ON_CLICK = { row = 3, label = "Enable item activation with mouse (requires /reload)" },
+    STACKS_BOTTOM = { row = 4, label = "Move stacks to the bottom of the frame" },
+    SHOW_DECIMALS = { row = 5, label = "Show cooldown decimal (for built-in cooldown)", skip = true },
+    FORCE30 = { row = 6, label = "Force 30 seconds iCD on swap", skip = true },
+    SHOW_PROC_ICON = { row = 7, label = "Show proc icon instead of item icon while active" },
 }
+
+local function redraw_all()
+    for _, frame in pairs(FRAMES) do
+        frame:RedrawFrame()
+    end
+end
+
+local function refresh_all_procs()
+    for _, frame in pairs(FRAMES) do
+        if frame and frame.AuraCheck then
+            frame:AuraCheck(true)
+        end
+    end
+end
 
 local show_slider_edit_box = function(self)
     self.EditBox:Show()
@@ -154,13 +117,13 @@ local function new_slider(parent_frame, option_name, properties)
     slider.InfoText = slider:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     slider.InfoText:SetPoint("TOP", slider, 0, 20)
     slider.InfoText:SetSize(250, 20)
-	slider.InfoText:SetJustifyH("CENTER")
+    slider.InfoText:SetJustifyH("CENTER")
     slider.InfoText:SetText(properties.label)
 
     local EditBoxID = EDITBOX_NAME:format(parent_frame.name, option_name)
     slider.EditBox = CreateFrame("EditBox", EditBoxID, slider, "InputBoxTemplate")
-	slider.EditBox:SetPoint("LEFT", slider, "RIGHT", 10, 0)
-	slider.EditBox:SetSize(50, 20)
+    slider.EditBox:SetPoint("LEFT", slider, "RIGHT", 10, 0)
+    slider.EditBox:SetSize(50, 20)
     slider.EditBox:SetMaxLetters(5)
     slider.EditBox:SetJustifyH("RIGHT")
     slider.EditBox:SetMultiLine(false)
@@ -186,7 +149,6 @@ local function new_slider(parent_frame, option_name, properties)
         parent_frame.item_frame:RedrawFrame()
     end)
 
-    -- Store reference for updating after drag
     local slot_ID = parent_frame.item_frame.slot_ID
     if not OPTIONS_FRAME.item_sliders[slot_ID] then
         OPTIONS_FRAME.item_sliders[slot_ID] = {}
@@ -196,7 +158,6 @@ local function new_slider(parent_frame, option_name, properties)
     return slider
 end
 
--- Function to update sliders after drag & drop
 function OPTIONS_FRAME:UpdateSliders(slot_ID)
     local sliders = self.item_sliders[slot_ID]
     if not sliders then return end
@@ -206,16 +167,10 @@ function OPTIONS_FRAME:UpdateSliders(slot_ID)
 
     for option_name, slider in pairs(sliders) do
         local value = frame.settings[option_name]
-        if value then
+        if value ~= nil then
             slider:SetValue(value)
             slider.EditBox:SetText(value)
         end
-    end
-end
-
-local function redraw_all()
-    for _, frame in pairs(FRAMES) do
-        frame:RedrawFrame()
     end
 end
 
@@ -226,7 +181,7 @@ function OPTIONS_FRAME:add_main_settings()
 
     local title = config_frame:CreateFontString(nil, nil, "GameFontNormalLarge")
     title:SetPoint("TOPLEFT", MARGIN, -MARGIN)
-    title:SetText(format("%s %s" , ADDON_NAME, GetAddOnMetadata(ADDON_NAME, "Version")))
+    title:SetText(format("%s %s", ADDON_NAME, GetAddOnMetadata(ADDON_NAME, "Version")))
 
     for key, values in pairs(CB_DEFAULTS_MAIN) do
         local cb = new_check_box(config_frame, frame_ID, values.row)
@@ -236,12 +191,120 @@ function OPTIONS_FRAME:add_main_settings()
         cb:SetScript("OnClick", function()
             SWITCHES[key] = cb:GetChecked() and 1 or 0
             if not properties.skip then redraw_all() end
+            if key == "SHOW_PROC_ICON" then
+                refresh_all_procs()
+            end
         end)
     end
 
     InterfaceOptions_AddCategory(config_frame)
     self.main_options = config_frame
     return config_frame
+end
+
+function OPTIONS_FRAME:add_glow_settings()
+    local config_frame = CreateFrame("Frame", nil, self)
+    config_frame.name = "Glow"
+    config_frame.parent = self.main_options.name
+
+    local title = config_frame:CreateFontString(nil, nil, "GameFontNormalLarge")
+    title:SetPoint("TOPLEFT", MARGIN, -MARGIN)
+    title:SetText("Glow")
+
+    local cbName = ADDON_NAME .. "EnableGlowCB"
+    local enableCB = CreateFrame("CheckButton", cbName, config_frame, "InterfaceOptionsCheckButtonTemplate")
+    enableCB:SetPoint("TOPLEFT", MARGIN, -MARGIN * 2 * 2)
+    enableCB.label = _G[cbName.."Text"]
+    enableCB.label:SetText("Enable proc glow")
+    enableCB:SetChecked(SWITCHES.SHOW_PROC_GLOW ~= 0)
+    enableCB:SetScript("OnClick", function()
+        SWITCHES.SHOW_PROC_GLOW = enableCB:GetChecked() and 1 or 0
+        refresh_all_procs()
+    end)
+
+    local glowStyleLabel = config_frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    glowStyleLabel:SetPoint("TOPLEFT", MARGIN, -MARGIN * 2 * 3.8)
+    glowStyleLabel:SetText("Glow style:")
+
+    local glowStyleDropDown = CreateFrame("Frame", ADDON_NAME.."GlowStyleDropDown", config_frame, "UIDropDownMenuTemplate")
+    glowStyleDropDown:SetPoint("TOPLEFT", MARGIN * 6.0, -MARGIN * 2 * 4.25)
+    UIDropDownMenu_SetWidth(glowStyleDropDown, 170)
+
+    local function GlowStyle_OnClick(btn)
+        SWITCHES.PROC_GLOW_STYLE = btn.value
+        UIDropDownMenu_SetText(glowStyleDropDown, btn.text)
+        refresh_all_procs()
+    end
+
+    local function GlowStyle_Init()
+        local info = UIDropDownMenu_CreateInfo()
+        info.func = GlowStyle_OnClick
+        info.notCheckable = true
+
+        info.text = "Action Button"
+        info.value = 1
+        UIDropDownMenu_AddButton(info)
+
+        info.text = "Pixel"
+        info.value = 2
+        UIDropDownMenu_AddButton(info)
+    end
+
+    UIDropDownMenu_Initialize(glowStyleDropDown, GlowStyle_Init)
+    UIDropDownMenu_SetText(glowStyleDropDown, (SWITCHES.PROC_GLOW_STYLE == 2) and "Pixel" or "Action Button")
+
+    local perIconTitle = config_frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    perIconTitle:SetPoint("TOPLEFT", MARGIN, -MARGIN * 2 * 6)
+    perIconTitle:SetText("Enable glow per icon:")
+
+    local function makePerIconCB(i, slot_ID)
+        local col = (i - 1) % 2
+        local row = floor((i - 1) / 2)
+        local x = MARGIN + col * 220
+        local y = -MARGIN * 2 * 6.8 - row * 24
+
+        local name = ADDON_NAME.."GlowPerIcon"..slot_ID
+        local cb = CreateFrame("CheckButton", name, config_frame, "InterfaceOptionsCheckButtonTemplate")
+        cb:SetPoint("TOPLEFT", x, y)
+        cb.label = _G[name.."Text"]
+
+        local itemName = (FRAMES[slot_ID] and FRAMES[slot_ID].item_group) or (DB and DB.ITEM_GROUP and DB.ITEM_GROUP[slot_ID]) or ("Slot "..slot_ID)
+        cb.label:SetText(itemName)
+
+        local frame = FRAMES[slot_ID]
+        local checked = (frame and (frame.settings.PROC_GLOW == nil or frame.settings.PROC_GLOW ~= 0)) and true or false
+        cb:SetChecked(checked)
+
+        cb:SetScript("OnClick", function()
+            local f = FRAMES[slot_ID]
+            if not f then return end
+            f.settings.PROC_GLOW = cb:GetChecked() and 1 or 0
+            refresh_all_procs()
+        end)
+
+        cb._tcd_slot = slot_ID
+        return cb
+    end
+
+    config_frame._perIconCBs = {}
+    for i, slot_ID in ipairs(ADDON.SORTED_ITEMS) do
+        config_frame._perIconCBs[#config_frame._perIconCBs + 1] = makePerIconCB(i, slot_ID)
+    end
+
+    config_frame:SetScript("OnShow", function()
+        UIDropDownMenu_Initialize(glowStyleDropDown, GlowStyle_Init)
+        UIDropDownMenu_SetText(glowStyleDropDown, (SWITCHES.PROC_GLOW_STYLE == 2) and "Pixel" or "Action Button")
+        enableCB:SetChecked(SWITCHES.SHOW_PROC_GLOW ~= 0)
+
+        for _, cb in ipairs(config_frame._perIconCBs) do
+            local slot_ID = cb._tcd_slot
+            local frame = FRAMES[slot_ID]
+            local checked = (frame and (frame.settings.PROC_GLOW == nil or frame.settings.PROC_GLOW ~= 0)) and true or false
+            cb:SetChecked(checked)
+        end
+    end)
+
+    InterfaceOptions_AddCategory(config_frame)
 end
 
 function OPTIONS_FRAME:add_item_settings(slot_ID)
@@ -269,7 +332,7 @@ function OPTIONS_FRAME:add_item_settings(slot_ID)
 end
 
 local function cb_pos(cb, i)
-    local row = 7 + (i-i%2)/2
+    local row = 8 + floor(i / 2)
     local y = MARGIN * 2 * row
     local x = MARGIN + 120 * (i % 2)
     cb:SetPoint("TOPLEFT", x, -y)
@@ -277,6 +340,7 @@ end
 
 local dropDown
 local LSM = LibStub and LibStub("LibSharedMedia-3.0", true)
+
 local function WPDropDownDemo_OnClick(self, arg1)
     UIDropDownMenu_SetText(dropDown, self.value)
     SWITCHES.FONT_FILE = arg1
@@ -288,44 +352,116 @@ local function sort_fonts_alpha(font_table)
     for font_name in pairs(font_table) do
         _sorted[#_sorted+1] = font_name
     end
-
     sort(_sorted, function(a, b) return a < b end)
-
     return _sorted
 end
+
+local FONTS_PER_PAGE = 25
 
 local function WPDropDownDemo_Menu(frame, level, menuList)
     local font_table = LSM:HashTable('font')
     local font_table_sorted = sort_fonts_alpha(font_table)
 
-    local info = UIDropDownMenu_CreateInfo()
-    info.func = WPDropDownDemo_OnClick
-    info.text, info.arg1 = "Default", ""
-    UIDropDownMenu_AddButton(info)
-    UIDropDownMenu_SetText(dropDown, "Default")
+    if level == 1 then
+        local info = UIDropDownMenu_CreateInfo()
+        info.func = WPDropDownDemo_OnClick
+        info.text, info.arg1 = "Default", ""
+        UIDropDownMenu_AddButton(info, level)
 
-    for _, font_name in ipairs(font_table_sorted) do
-        local font_path = font_table[font_name]
-        info.text, info.arg1 = font_name, font_path
-        if font_path == SWITCHES.FONT_FILE then
-            UIDropDownMenu_SetText(dropDown, font_name)
+        local groups = {}
+        local group_order = {}
+        for _, font_name in ipairs(font_table_sorted) do
+            local first = font_name:sub(1, 1):upper()
+            if not groups[first] then
+                groups[first] = {}
+                group_order[#group_order + 1] = first
+            end
+            groups[first][#groups[first] + 1] = font_name
         end
-        UIDropDownMenu_AddButton(info)
+
+        if #font_table_sorted <= FONTS_PER_PAGE then
+            for _, font_name in ipairs(font_table_sorted) do
+                local font_path = font_table[font_name]
+                info = UIDropDownMenu_CreateInfo()
+                info.func = WPDropDownDemo_OnClick
+                info.text, info.arg1 = font_name, font_path
+                UIDropDownMenu_AddButton(info, level)
+            end
+        else
+            sort(group_order)
+            local current_group = {}
+            local current_label_start = group_order[1]
+            local current_label_end = group_order[1]
+            local current_count = 0
+
+            for _, letter in ipairs(group_order) do
+                local group_fonts = groups[letter]
+                if current_count + #group_fonts > FONTS_PER_PAGE and current_count > 0 then
+                    info = UIDropDownMenu_CreateInfo()
+                    info.text = current_label_start .. " - " .. current_label_end
+                    info.hasArrow = true
+                    info.notCheckable = true
+                    info.menuList = current_group
+                    UIDropDownMenu_AddButton(info, level)
+
+                    current_group = {}
+                    current_label_start = letter
+                    current_count = 0
+                end
+                for _, fn in ipairs(group_fonts) do
+                    current_group[#current_group + 1] = fn
+                end
+                current_label_end = letter
+                current_count = current_count + #group_fonts
+            end
+
+            if current_count > 0 then
+                info = UIDropDownMenu_CreateInfo()
+                info.text = current_label_start .. " - " .. current_label_end
+                info.hasArrow = true
+                info.notCheckable = true
+                info.menuList = current_group
+                UIDropDownMenu_AddButton(info, level)
+            end
+        end
+
+        local current_found = false
+        for font_name, font_path in pairs(font_table) do
+            if font_path == SWITCHES.FONT_FILE then
+                UIDropDownMenu_SetText(dropDown, font_name)
+                current_found = true
+                break
+            end
+        end
+        if not current_found then
+            UIDropDownMenu_SetText(dropDown, "Default")
+        end
+    elseif level == 2 and menuList then
+        for _, font_name in ipairs(menuList) do
+            local font_path = font_table[font_name]
+            local info = UIDropDownMenu_CreateInfo()
+            info.func = WPDropDownDemo_OnClick
+            info.text, info.arg1 = font_name, font_path
+            if font_path == SWITCHES.FONT_FILE then
+                info.checked = true
+            end
+            UIDropDownMenu_AddButton(info, level)
+        end
     end
 end
 
 local function add_trinket_swap_edit_box(config_frame)
     local swap_label = config_frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    swap_label:SetPoint("TOPLEFT", MARGIN, -MARGIN * 2 * 11.15)
+    swap_label:SetPoint("TOPLEFT", MARGIN, -MARGIN * 2 * 12.15)
     swap_label:SetText("Trinket to swap with ctrl:")
 
     local swap_info = config_frame:CreateFontString(nil, "OVERLAY", "GameTooltipText")
-    swap_info:SetPoint("TOPLEFT", MARGIN, -MARGIN * 2 * 12)
+    swap_info:SetPoint("TOPLEFT", MARGIN, -MARGIN * 2 * 13)
     swap_info:SetText("Click on edit box then click on item in inventory.")
 
     local item_id_eb = CreateFrame("EditBox", ADDON_NAME.."ItemSwapID", config_frame, "InputBoxTemplate")
-    item_id_eb:SetPoint("TOPLEFT", MARGIN * 11, -MARGIN * 2 * 11)
-	item_id_eb:SetSize(200, 20)
+    item_id_eb:SetPoint("TOPLEFT", MARGIN * 11, -MARGIN * 2 * 12)
+    item_id_eb:SetSize(200, 20)
     item_id_eb:SetMultiLine(false)
     item_id_eb:SetAutoFocus(false)
     item_id_eb:ClearFocus()
@@ -364,16 +500,14 @@ local function add_trinket_swap_edit_box(config_frame)
         char_profile["trinket_swap_link"] = item_link
         ADDON.TRINKET_SWAP_ID = item_id
     end)
-    item_id_eb:SetScript("OnShow", function ()
+
+    item_id_eb:SetScript("OnShow", function()
         local char_profile = _G["TrinketCDsProfileChar"]
         local item_link = char_profile and char_profile["trinket_swap_link"] or DEFAULT_TRINKET_SWAP_LINK
         item_id_eb:SetText(item_link)
     end)
 end
 
--- ============================================================
--- Profile UI section
--- ============================================================
 function OPTIONS_FRAME:add_profile_settings()
     local config_frame = CreateFrame("Frame", nil, self)
     config_frame.name = "Profiles"
@@ -383,7 +517,6 @@ function OPTIONS_FRAME:add_profile_settings()
     title:SetPoint("TOPLEFT", MARGIN, -MARGIN)
     title:SetText("Profiles & Drag Mode")
 
-    -- Drag unlock button
     local yOffset = -MARGIN * 3
 
     local drag_info = config_frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
@@ -395,12 +528,9 @@ function OPTIONS_FRAME:add_profile_settings()
     dragBtn:SetPoint("TOPLEFT", MARGIN, yOffset)
     dragBtn:SetSize(220, 24)
     dragBtn:SetText("Toggle Drag Mode (/tcd drag)")
-    dragBtn:SetScript("OnClick", function()
-        ADDON:ToggleDragUnlock()
-    end)
+    dragBtn:SetScript("OnClick", function() ADDON:ToggleDragUnlock() end)
     yOffset = yOffset - 40
 
-    -- Separator
     local sep1 = config_frame:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
     sep1:SetPoint("TOPLEFT", MARGIN, yOffset)
     sep1:SetText("Save / Load Profiles")
@@ -411,12 +541,10 @@ function OPTIONS_FRAME:add_profile_settings()
     profile_info:SetText("Select existing profile from dropdown or type a new name below.")
     yOffset = yOffset - 25
 
-    -- Profile dropdown
     local profileDropDown = CreateFrame("Frame", ADDON_NAME.."ProfileDropDown", config_frame, "UIDropDownMenuTemplate")
     profileDropDown:SetPoint("TOPLEFT", MARGIN - 16, yOffset)
     UIDropDownMenu_SetWidth(profileDropDown, 200)
 
-    -- Profile name edit box
     local eb_label = config_frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     eb_label:SetPoint("TOPLEFT", MARGIN, yOffset - 35)
     eb_label:SetText("Profile name:")
@@ -456,13 +584,11 @@ function OPTIONS_FRAME:add_profile_settings()
     UIDropDownMenu_Initialize(profileDropDown, ProfileDropDown_Init)
     UIDropDownMenu_SetText(profileDropDown, "Select profile...")
 
-    -- Refresh dropdown every time the options panel is shown
     config_frame:SetScript("OnShow", function()
         UIDropDownMenu_Initialize(profileDropDown, ProfileDropDown_Init)
         UIDropDownMenu_SetText(profileDropDown, "Select profile...")
     end)
 
-    -- Buttons
     local saveBtn = CreateFrame("Button", ADDON_NAME.."SaveProfileBtn", config_frame, "UIPanelButtonTemplate")
     saveBtn:SetPoint("TOPLEFT", MARGIN, yOffset)
     saveBtn:SetSize(100, 24)
@@ -506,7 +632,6 @@ function OPTIONS_FRAME:add_profile_settings()
     end)
     yOffset = yOffset - 40
 
-    -- Usage hints
     local hints_title = config_frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     hints_title:SetPoint("TOPLEFT", MARGIN, yOffset)
     hints_title:SetText("Chat commands:")
@@ -533,6 +658,7 @@ function OPTIONS_FRAME:OnEvent(event, arg1)
     if arg1 ~= ADDON_NAME then return end
 
     local config_frame = self:add_main_settings()
+
     for i, slot_ID in ipairs(ADDON.SORTED_ITEMS) do
         self:add_item_settings(slot_ID)
         local item_frame = FRAMES[slot_ID]
@@ -541,23 +667,23 @@ function OPTIONS_FRAME:OnEvent(event, arg1)
         cb_show:SetChecked(item_frame.settings.SHOW ~= 0)
         cb_show:SetScript("OnClick", cb_toggle_item_visibility)
         cb_show.item_frame = item_frame
-        cb_pos(cb_show, i-1)
+        cb_pos(cb_show, i - 1)
     end
 
     add_trinket_swap_edit_box(config_frame)
 
     if LSM then
         local font_font = config_frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-        font_font:SetPoint("TOPLEFT", MARGIN, -MARGIN * 2 * 13.25)
+        font_font:SetPoint("TOPLEFT", MARGIN, -MARGIN * 2 * 14.25)
         font_font:SetText("Font:")
 
         dropDown = CreateFrame("Frame", "WPDemoDropDown", config_frame, "UIDropDownMenuTemplate")
-        dropDown:SetPoint("TOPLEFT", MARGIN * 3, -MARGIN * 2 * 13)
+        dropDown:SetPoint("TOPLEFT", MARGIN * 3, -MARGIN * 2 * 14)
         UIDropDownMenu_SetWidth(dropDown, 200)
         UIDropDownMenu_Initialize(dropDown, WPDropDownDemo_Menu)
     end
 
-    -- Profiles as separate subcategory
+    self:add_glow_settings()
     self:add_profile_settings()
 end
 

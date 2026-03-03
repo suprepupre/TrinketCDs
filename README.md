@@ -1,8 +1,8 @@
 # TrinketCDs (Fork)
 
-**Fast jump:** [Install](#install) | [Preview](#preview) | [New Features](#new-features) | [Drag & Drop](#drag--drop) | [Profiles](#profiles) | [Commands](#commands) | [Perfomance](#perfomance) | [Options](#options)
+**Fast jump:** [Install](#install) | [Preview](#preview) | [New Features](#new-features) | [Drag & Drop](#drag--drop) | [Profiles](#profiles) | [Proc Glow](#proc-glow) | [Commands](#commands) | [Performance](#performance) | [Options](#options)
 
-> Forked from [Ridepad/TrinketCDs](https://github.com/Ridepad/TrinketCDs) with permission.
+> Forked from [Ridepad/TrinketCDs](https://github.com/Ridepad/TrinketCDs).
 
 - Addon dynamically tracks cooldown of equipped trinkets and enchants.
 - Made to remove headache of copying/creating weakauras for every new character/item.
@@ -11,22 +11,34 @@
 - Ashen rings, cloak, weapon, hands, boots and belt enchants.
 - Doesn't depend on combat log.
 - Proc duration, stacks, cooldown.
-- Loging and Cooldown on login and after inventory change.
+- Cooldown tracking on login and after inventory change.
 - Has built-in cooldown text (use [OmniCC](https://www.curseforge.com/wow/addons/omni-cc/files/454434) as alternative).
-- Caches cooldown even if trinket was unequiped after proc (useful if server has different iCD on equip).
+- Caches cooldown even if trinket was unequipped after proc (useful if server has different iCD on equip).
+
+---
 
 ## New Features
 
+### ✨ Proc Glow
+Visual glow effect around icons when a trinket/enchant proc is active.
+
+- Glow appears automatically when a proc buff is detected
+- Two glow styles: **Action Button Glow** (default) and **Pixel Glow**
+- Action Button Glow matches WeakAuras visual style
+- Per-icon glow toggle for each equipment slot
+- Bundled [LibCustomGlow-1.0] with 3.3.5a compatibility
+- Dedicated **Glow** settings tab in Interface Options
+- Show proc icon instead of item icon while active
+
+
 ### 🔄 Drag & Drop Positioning
-Move trinket icons freely by dragging them with the mouse. No more manual X/Y coordinate input!
+Move trinket icons freely by dragging them with the mouse.
 
 - Toggle drag mode with `/tcd drag` or the button in options
 - All icons become visible with yellow highlight during drag mode
 - Positions are saved automatically when you release the icon
 - X/Y sliders in options update automatically after dragging
 - Drag mode is disabled during combat
-
-![Drag & Drop Demo](https://raw.githubusercontent.com/suprepupre/TrinketCDs/main/showcase/showcase_drag.gif)
 
 ### 💾 Profile System
 Save and load complete layouts across all your characters.
@@ -36,37 +48,59 @@ Save and load complete layouts across all your characters.
 - Manage profiles via dropdown menu in options or chat commands
 - Profiles are stored account-wide in SavedVariables
 
-![Profiles Demo](https://raw.githubusercontent.com/suprepupre/TrinketCDs/main/showcase/showcase_profiles.png)
 
 ---
 
 ## Install
 
-**Fast jump:** [Install](#install) | [Preview](#preview) | [New Features](#new-features) | [Drag & Drop](#drag--drop) | [Profiles](#profiles) | [Commands](#commands) | [Perfomance](#perfomance) | [Options](#options)
-
 - [Download](https://github.com/suprepupre/TrinketCDs/releases/latest).
 - Extract `TrinketCDs` folder into `<WoW Folder>/Interface/Addons/` folder.
 
-## Preview
+### Folder structure
 
-**Fast jump:** [Install](#install) | [Preview](#preview) | [New Features](#new-features) | [Drag & Drop](#drag--drop) | [Profiles](#profiles) | [Commands](#commands) | [Perfomance](#perfomance) | [Options](#options)
+```
+Interface/AddOns/TrinketCDs/
+├── Libs/
+│   ├── LibStub/
+│   │   └── LibStub.lua
+│   ├── PoolCompat.lua
+│   └── LibCustomGlow-1.0/
+│       ├── LibCustomGlow-1.0.lua
+│       ├── LibCustomGlow-1.0.toc
+│       ├── LibCustomGlow-1.0.xml
+│       ├── AM_29.blp
+│       ├── Artifacts.blp
+│       ├── IconAlert.blp
+│       ├── IconAlertAnts.blp
+│       └── UIActionBarFX.blp
+├── Media/
+│   ├── BigBorder.blp
+│   └── Emblem.ttf
+├── TrinketCDs.toc
+├── TrinketCDs_Wrath.toc
+├── TrinketCDsDB.lua
+├── TrinketCDs.lua
+└── TrinketCDsOptions.lua
+```
+
+---
+
+## Preview
 
 ### All items preview
 
-![Showcase all](https://raw.githubusercontent.com/suprepupre/TrinketCDs/main/showcase/showcase_all.png)
+![Showcase all](/showcase/showcase_all.png)
 
 ### Chicken swap preview
 
 Ctrl+Right mouse click to swap to chicken, left mouse click to use. (Ctrl+Right click again to swap back)
 > Automatically swaps back to previous trinket after chicken is used, regardless of how chicken was equipped.
 
-![Showcase chicken](https://raw.githubusercontent.com/suprepupre/TrinketCDs/main/showcase/showcase_chicken.gif)
+![Showcase chicken](/showcase/showcase_chicken.gif)
 
 ---
 
 ## Drag & Drop
-
-**Fast jump:** [Install](#install) | [Preview](#preview) | [New Features](#new-features) | [Drag & Drop](#drag--drop) | [Profiles](#profiles) | [Commands](#commands) | [Perfomance](#perfomance) | [Options](#options)
 
 ### How to use:
 1. Type `/tcd drag` in chat (or click "Toggle Drag Mode" button in options)
@@ -74,37 +108,37 @@ Ctrl+Right mouse click to swap to chicken, left mouse click to use. (Ctrl+Right 
 3. **Left-click and drag** any icon to move it
 4. Type `/tcd drag` again (or `/tcd lock`) to save positions and return to normal mode
 
-### Important notes:
-- ⚠️ Cannot enter drag mode during combat
+### Notes:
+- Cannot enter drag mode during combat
 - Positions are saved to your character's settings automatically
 - X/Y sliders in the options panel update in real-time after dragging
 - You can still use X/Y sliders for fine-tuning after drag positioning
 
-![Drag & Drop Demo](https://raw.githubusercontent.com/suprepupre/TrinketCDs/main/showcase/showcase_drag.gif)
+![Drag & Drop Demo](/showcase/showcase_drag.gif)
 
 ---
 
 ## Profiles
 
-**Fast jump:** [Install](#install) | [Preview](#preview) | [New Features](#new-features) | [Drag & Drop](#drag--drop) | [Profiles](#profiles) | [Commands](#commands) | [Perfomance](#perfomance) | [Options](#options)
-
 ### What is saved in a profile:
 - All icon positions (X/Y)
-- Icon sizes
-- Zoom, border settings
+- Icon sizes, zoom, border settings
 - Font sizes (CD, stacks, item level)
 - Visibility settings (show/hide individual slots)
-- Global switches (combat only, hide ready, etc.)
+- Global switches (combat only, hide ready, proc glow, glow style, etc.)
+- Per-icon glow toggle
 
 ### Using profiles via chat:
-1. /tcd save MyLayout - Save current settings as "MyLayout"
-2. /tcd load MyLayout - Load "MyLayout" profile
-3. /tcd delete MyLayout - Delete "MyLayout" profile
-4. /tcd profiles - List all saved profiles
+```
+/tcd save MyLayout      — Save current settings
+/tcd load MyLayout      — Load profile
+/tcd delete MyLayout    — Delete profile
+/tcd profiles           — List all saved profiles
+```
 
 ### Using profiles via UI:
 1. Open options: `/tcd options`
-2. Scroll to **Profiles** section at the bottom
+2. Go to **TrinketCDs → Profiles** subcategory
 3. Select existing profile from dropdown or type a new name
 4. Click **Save**, **Load**, or **Delete**
 
@@ -114,13 +148,39 @@ Ctrl+Right mouse click to swap to chicken, left mouse click to use. (Ctrl+Right 
 3. Log in to Character B
 4. `/tcd load healer_layout`
 
-![Profiles Demo](https://raw.githubusercontent.com/suprepupre/TrinketCDs/main/showcase/showcase_profiles.png)
+![Profiles Demo](/showcase/showcase_profiles.png)
 
 ---
 
-## Commands
+## Proc Glow
 
-**Fast jump:** [Install](#install) | [Preview](#preview) | [New Features](#new-features) | [Drag & Drop](#drag--drop) | [Profiles](#profiles) | [Commands](#commands) | [Perfomance](#perfomance) | [Options](#options)
+### How it works:
+- When a tracked item proc buff is active, a glow effect appears around the icon.
+- Glow disappears automatically when the buff fades.
+
+### Glow styles:
+
+| Style | Description |
+|-------|-------------|
+| **Action Button** | Classic WoW action bar glow with marching ants animation |
+| **Pixel** | Colored pixel dots orbiting the icon border |
+
+### Settings (TrinketCDs → Glow):
+- **Enable proc glow** — master toggle for all glow effects
+- **Glow style** — dropdown to choose Action Button or Pixel
+- **Per-icon toggles** — enable/disable glow for each equipment slot
+
+### Defaults:
+- Proc glow is **enabled**
+- Glow style is **Action Button**
+- All icons have glow enabled
+- Proc icon replacement is **disabled** (item icon stays visible during procs)
+
+![Showcase Glow](/showcase/showcase_glow1.png)
+![Showcase Glow](/showcase/showcase_glow2.png)
+---
+
+## Commands
 
 All commands start with `/tcd`:
 
@@ -151,55 +211,73 @@ All commands start with `/tcd`:
 | **Alt + Left-click** | Swap to same-name trinket (different ilvl) |
 | **Ctrl + Right-click** | Swap to/from chicken trinket |
 
-### Left mouse click preview
+### Ctrl-click
 
-Default iCD vs 30 sec forced
+Reequips trinket to force its cooldown.
 
-#### Ctrl-click
+![Showcase swap with control](/showcase/showcase_swap_ctrl.gif)
+![Showcase swap with control and 30](/showcase/showcase_swap_ctrl30.gif)
 
-Reequips trinket to force it's cooldown.
-
-![Showcase swap with control](https://raw.githubusercontent.com/suprepupre/TrinketCDs/main/showcase/showcase_swap_ctrl.gif)
-![Showcase swap with control and 30](https://raw.githubusercontent.com/suprepupre/TrinketCDs/main/showcase/showcase_swap_ctrl30.gif)
-
-#### Shift-click
+### Shift-click
 
 Swaps trinkets places to force cooldown for both.
 
-![Showcase swap with shift](https://raw.githubusercontent.com/suprepupre/TrinketCDs/main/showcase/showcase_swap_shift.gif)
-![Showcase swap with shift and 30](https://raw.githubusercontent.com/suprepupre/TrinketCDs/main/showcase/showcase_swap_shift30.gif)
+![Showcase swap with shift](/showcase/showcase_swap_shift.gif)
+![Showcase swap with shift and 30](/showcase/showcase_swap_shift30.gif)
 
-#### Alt-click
+### Alt-click
 
 Swaps for trinket with same name, but different ilvl (if exists in bag).
 
-![Showcase swap with alt](https://raw.githubusercontent.com/suprepupre/TrinketCDs/main/showcase/showcase_swap_alt.gif)
-![Showcase swap with alt and 30](https://raw.githubusercontent.com/suprepupre/TrinketCDs/main/showcase/showcase_swap_alt30.gif)
+![Showcase swap with alt](/showcase/showcase_swap_alt.gif)
+![Showcase swap with alt and 30](/showcase/showcase_swap_alt30.gif)
 
 ---
 
-## Perfomance
-
-**Fast jump:** [Install](#install) | [Preview](#preview) | [New Features](#new-features) | [Drag & Drop](#drag--drop) | [Profiles](#profiles) | [Commands](#commands) | [Perfomance](#perfomance) | [Options](#options)
+## Performance
 
 CPU usage from LoD kill
 
-![Showcase cpu usage](https://raw.githubusercontent.com/suprepupre/TrinketCDs/main/showcase/showcase_cpu_usage.png)
+![Showcase cpu usage](/showcase/showcase_cpu_usage.png)
 
 ---
 
 ## Options
 
-**Fast jump:** [Install](#install) | [Preview](#preview) | [New Features](#new-features) | [Drag & Drop](#drag--drop) | [Profiles](#profiles) | [Commands](#commands) | [Perfomance](#perfomance) | [Options](#options)
-
 Check in game options for settings. Type `/tcd options` to open.
 
-![Showcase options 1](https://raw.githubusercontent.com/suprepupre/TrinketCDs/main/showcase/showcase_options1.png)
-![Showcase options 2](https://raw.githubusercontent.com/suprepupre/TrinketCDs/main/showcase/showcase_options2.png)
+Settings subcategories:
+- **TrinketCDs** — main settings, visibility toggles, trinket swap
+- **Trinket1 / Trinket2 / Ring / Belt / ...** — per-icon position, size, zoom, border, font
+- **Glow** — proc glow enable, style selection, per-icon glow toggles
+- **Profiles** — drag mode button, save/load/delete profiles
+
+![Showcase options 1](/showcase/showcase_options1.png)
+![Showcase options 2](/showcase/showcase_options2.png)
+
+---
+
+## Changelog
+
+### v2.4.1
+- Added proc glow effect (Action Button Glow and Pixel Glow)
+- Bundled LibCustomGlow-1.0 with LibStub and PoolCompat for 3.3.5a
+- Added per-icon glow toggle
+- Added Glow settings tab in Interface Options
+- Added Drag & Drop icon positioning (`/tcd drag`)
+- Added profile system (save/load/delete via chat and UI)
+- Added per-character auto-save on logout
+- Added Profiles settings tab
+- Fixed SetColorTexture missing in 3.3.5a
+- Fixed version detection via GetBuildInfo()
+- Fixed UI overlap for Profiles panel
+
+### v2.3.0 (upstream)
+- Original release by Ridepad
 
 ---
 
 ## Credits
 
 - Original addon by [Ridepad](https://github.com/Ridepad/TrinketCDs)
-- Fork additions by [Suprematist]: Drag & Drop positioning, Profile system 
+- Fork by [suprepupre](https://github.com/suprepupre/TrinketCDs): Drag & Drop, Profiles, Proc Glow
