@@ -1,0 +1,19 @@
+## Interface: 30300
+## Title:|cffee0080TrinketCDs|r
+## Version: 2.4.2
+## SavedVariables: TrinketCDsProfile, TrinketCDsProfiles
+## SavedVariablesPerCharacter: TrinketCDsProfileChar
+## Notes: Trinkets and item enchants proc tracker. Drag & Drop + Profiles.
+## Notes-ruRU: Отслеживает баффы предметов и энчантов. Drag & Drop + Профили.
+## OptionalDeps: OmniCC, LibSharedMedia-3.0
+
+## X-Category: Combat
+## X-Website: https://github.com/suprepupre/TrinketCDs
+
+Libs\LibStub\LibStub.lua
+Libs\PoolCompat.lua
+Libs\LibCustomGlow-1.0\LibCustomGlow-1.0.lua
+
+TrinketCDsDB.lua
+TrinketCDs.lua
+TrinketCDsOptions.lua

@@ -1,6 +1,6 @@
 ## Interface: 30300
 ## Title:|cffee0080TrinketCDs|r
-## Version: 2.4.1
+## Version: 2.4.2
 ## SavedVariables: TrinketCDsProfile, TrinketCDsProfiles
 ## SavedVariablesPerCharacter: TrinketCDsProfileChar
 ## Notes: Trinkets and item enchants proc tracker. Drag & Drop + Profiles.

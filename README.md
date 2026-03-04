@@ -23,13 +23,15 @@
 Visual glow effect around icons when a trinket/enchant proc is active.
 
 - Glow appears automatically when a proc buff is detected
-- Two glow styles: **Action Button Glow** (default) and **Pixel Glow**
-- Action Button Glow matches WeakAuras visual style
+- Three glow styles: **Action Button Glow** (default), **Pixel Glow**, and **Proc Glow**
+- Action Button Glow — classic WoW marching ants animation
+- Pixel Glow — colored pixel dots orbiting the border
+- Proc Glow — WeakAuras-style flipbook proc animation (uses UIActionBarFX spritesheet)
 - Per-icon glow toggle for each equipment slot
 - Bundled [LibCustomGlow-1.0] with 3.3.5a compatibility
 - Dedicated **Glow** settings tab in Interface Options
 - Show proc icon instead of item icon while active
-
+- Text (cooldown, stacks, ilvl) always renders above glow effects
 
 ### 🔄 Drag & Drop Positioning
 Move trinket icons freely by dragging them with the mouse.
@@ -48,6 +50,13 @@ Save and load complete layouts across all your characters.
 - Manage profiles via dropdown menu in options or chat commands
 - Profiles are stored account-wide in SavedVariables
 
+### 🔤 Font Settings
+Separate font configuration tab with LibSharedMedia-3.0 support.
+
+- Dedicated **Fonts** subcategory in Interface Options
+- Dropdown with all fonts from LibSharedMedia-3.0
+- Grouped alphabetically with submenus for large font libraries
+- Live font preview that updates instantly when selecting a font
 
 ---
 
@@ -123,7 +132,7 @@ Ctrl+Right mouse click to swap to chicken, left mouse click to use. (Ctrl+Right 
 ### What is saved in a profile:
 - All icon positions (X/Y)
 - Icon sizes, zoom, border settings
-- Font sizes (CD, stacks, item level)
+- Font settings (file, CD size, stacks size, item level size)
 - Visibility settings (show/hide individual slots)
 - Global switches (combat only, hide ready, proc glow, glow style, etc.)
 - Per-icon glow toggle
@@ -164,10 +173,11 @@ Ctrl+Right mouse click to swap to chicken, left mouse click to use. (Ctrl+Right 
 |-------|-------------|
 | **Action Button** | Classic WoW action bar glow with marching ants animation |
 | **Pixel** | Colored pixel dots orbiting the icon border |
+| **Proc Glow** | WeakAuras-style animated proc effect using flipbook spritesheet |
 
 ### Settings (TrinketCDs → Glow):
 - **Enable proc glow** — master toggle for all glow effects
-- **Glow style** — dropdown to choose Action Button or Pixel
+- **Glow style** — dropdown to choose Action Button, Pixel, or Proc Glow
 - **Per-icon toggles** — enable/disable glow for each equipment slot
 
 ### Defaults:
@@ -178,6 +188,7 @@ Ctrl+Right mouse click to swap to chicken, left mouse click to use. (Ctrl+Right 
 
 ![Showcase Glow](/showcase/showcase_glow1.png)
 ![Showcase Glow](/showcase/showcase_glow2.png)
+
 ---
 
 ## Commands
@@ -248,8 +259,9 @@ Check in game options for settings. Type `/tcd options` to open.
 
 Settings subcategories:
 - **TrinketCDs** — main settings, visibility toggles, trinket swap
-- **Trinket1 / Trinket2 / Ring / Belt / ...** — per-icon position, size, zoom, border, font
-- **Glow** — proc glow enable, style selection, per-icon glow toggles
+- **Trinket1 / Trinket2 / Ring / Belt / ...** — per-icon position, size, zoom, border, font sizes
+- **Fonts** — font selection via LibSharedMedia-3.0, live preview
+- **Glow** — proc glow enable, style selection (Action Button / Pixel / Proc Glow), per-icon toggles
 - **Profiles** — drag mode button, save/load/delete profiles
 
 ![Showcase options 1](/showcase/showcase_options1.png)
@@ -258,6 +270,15 @@ Settings subcategories:
 ---
 
 ## Changelog
+
+### v2.4.2
+- Added 3rd glow style: **Proc Glow** (WeakAuras-style flipbook animation)
+- Glow style dropdown now correctly shows selected style with checkmark
+- Moved font settings to dedicated **Fonts** subcategory with live preview
+- Font preview updates instantly on selection
+- Fixed Dislodged Foreign Object not showing proc buff (stacked buff fallback)
+- Fixed Action Button Glow overlapping cooldown/stacks/ilvl text
+- Text overlay now always renders above all glow effects
 
 ### v2.4.1
 - Added proc glow effect (Action Button Glow and Pixel Glow)
@@ -280,4 +301,4 @@ Settings subcategories:
 ## Credits
 
 - Original addon by [Ridepad](https://github.com/Ridepad/TrinketCDs)
-- Fork by [suprepupre](https://github.com/suprepupre/TrinketCDs): Drag & Drop, Profiles, Proc Glow
+- Fork by [suprepupre](https://github.com/suprepupre/TrinketCDs): Drag & Drop, Profiles, Proc Glow, Fonts
