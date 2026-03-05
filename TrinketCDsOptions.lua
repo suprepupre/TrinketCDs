@@ -366,7 +366,7 @@ local function FontDropDown_OnClick(self, arg1)
     if arg1 and arg1 ~= "" then
         SWITCHES.FONT_FILE = arg1
     else
-        SWITCHES.FONT_FILE = ADDON.SETTINGS.SWITCHES.FONT_FILE
+        SWITCHES.FONT_FILE = ADDON.DEFAULT_FONT
     end
     redraw_all()
 

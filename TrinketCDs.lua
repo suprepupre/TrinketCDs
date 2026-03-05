@@ -19,6 +19,7 @@ local ADDON_MEDIA = format("Interface\\Addons\\%s\\Media\\%%s", ADDON_NAME)
 local BORDER_TEXTURE = ADDON_MEDIA:format("BigBorder.blp")
 local DEFAULT_FONT_FILE = "Emblem.ttf"
 local DEFAULT_FONT = ADDON_MEDIA:format(DEFAULT_FONT_FILE)
+ADDON.DEFAULT_FONT = DEFAULT_FONT
 SWITCHES.FONT_FILE = DEFAULT_FONT
 
 local GetTime = GetTime
@@ -568,12 +569,18 @@ local function PlayerInCombat()
 end
 
 local function ToggleVisibility(self)
-    if not self.item or (self.button and InCombatLockdown()) then return end
+    if self.button and InCombatLockdown() then return end
 
     if ADDON.DRAG_UNLOCK then
-        self:Show()
+        if self.item and self.settings.SHOW ~= 0 then
+            self:Show()
+        else
+            self:Hide()
+        end
         return
     end
+
+    if not self.item then return end
 
     if self.settings.SHOW == 0
     or (SWITCHES.COMBAT_ONLY ~= 0 and not PlayerInCombat())
@@ -912,16 +919,22 @@ function ADDON:ToggleDragUnlock()
     ADDON.DRAG_UNLOCK = not ADDON.DRAG_UNLOCK
 
     for _, frame in pairs(self.FRAMES) do
-        frame:EnableMouse(ADDON.DRAG_UNLOCK)
         if ADDON.DRAG_UNLOCK then
-            frame:Show()
-            if not frame.drag_highlight then
-                frame.drag_highlight = frame:CreateTexture(nil, "HIGHLIGHT")
-                frame.drag_highlight:SetAllPoints()
-                frame.drag_highlight:SetTexture(1, 1, 0, 0.3)
+            if frame.item and frame.settings.SHOW ~= 0 then
+                frame:EnableMouse(true)
+                frame:Show()
+                if not frame.drag_highlight then
+                    frame.drag_highlight = frame:CreateTexture(nil, "HIGHLIGHT")
+                    frame.drag_highlight:SetAllPoints()
+                    frame.drag_highlight:SetTexture(1, 1, 0, 0.3)
+                end
+                frame.drag_highlight:Show()
+            else
+                frame:EnableMouse(false)
+                frame:Hide()
             end
-            frame.drag_highlight:Show()
         else
+            frame:EnableMouse(false)
             if frame.drag_highlight then
                 frame.drag_highlight:Hide()
             end
